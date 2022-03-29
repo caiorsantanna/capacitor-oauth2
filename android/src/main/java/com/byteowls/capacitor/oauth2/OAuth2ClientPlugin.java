@@ -88,6 +88,7 @@ public class OAuth2ClientPlugin extends Plugin {
     private AuthorizationService authService;
     private AuthState authState;
     private String callbackId;
+    private AuthorizationRequest authRequest;
 
     public OAuth2ClientPlugin() {
     }
@@ -268,6 +269,8 @@ public class OAuth2ClientPlugin extends Plugin {
 
             AuthorizationRequest req = builder.build();
 
+            this.authRequest = req;
+
             this.authService = new AuthorizationService(getContext());
             try {
                 Intent authIntent = this.authService.getAuthorizationRequestIntent(req);
@@ -337,7 +340,13 @@ public class OAuth2ClientPlugin extends Plugin {
             AuthorizationResponse authorizationResponse;
             AuthorizationException error;
             try {
-                authorizationResponse = AuthorizationResponse.fromIntent(intent);
+                if (intent.getData().getQueryParameter("state").length() > 0) {
+                    authorizationResponse = new AuthorizationResponse.Builder(this.authRequest)
+                        .fromUri(Uri.parse(intent.getDataString()))
+                        .build();
+                } else {
+                    authorizationResponse = AuthorizationResponse.fromIntent(intent);
+                }
                 error = AuthorizationException.fromIntent(intent);
                 this.authState.update(authorizationResponse, error);
             } catch (Exception e) {
