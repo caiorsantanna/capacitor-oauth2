@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FE1C41B721861FFC00F8236E"
-               BuildableName = "ByteowlsCapacitorOauth2.framework"
-               BlueprintName = "ByteowlsCapacitorOauth2"
-               ReferencedContainer = "container:ByteowlsCapacitorOauth2.xcodeproj">
+               BuildableName = "VelocitycubedCapacitorOauth2.framework"
+               BlueprintName = "VelocitycubedCapacitorOauth2"
+               ReferencedContainer = "container:VelocitycubedCapacitorOauth2.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -44,9 +44,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FE1C41B721861FFC00F8236E"
-            BuildableName = "ByteowlsCapacitorOauth2.framework"
-            BlueprintName = "ByteowlsCapacitorOauth2"
-            ReferencedContainer = "container:ByteowlsCapacitorOauth2.xcodeproj">
+            BuildableName = "VelocitycubedCapacitorOauth2.framework"
+            BlueprintName = "VelocitycubedCapacitorOauth2"
+            ReferencedContainer = "container:VelocitycubedCapacitorOauth2.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </LaunchAction>
@@ -60,9 +60,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FE1C41B721861FFC00F8236E"
-            BuildableName = "ByteowlsCapacitorOauth2.framework"
-            BlueprintName = "ByteowlsCapacitorOauth2"
-            ReferencedContainer = "container:ByteowlsCapacitorOauth2.xcodeproj">
+            BuildableName = "VelocitycubedCapacitorOauth2.framework"
+            BlueprintName = "VelocitycubedCapacitorOauth2"
+            ReferencedContainer = "container:VelocitycubedCapacitorOauth2.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </ProfileAction>
