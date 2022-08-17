@@ -122,38 +122,98 @@ export class WebUtils {
         return randomStr;
     }
 
-    static async buildWebOptions(configOptions: OAuth2AuthenticateOptions): Promise<WebOptions> {
-        const webOptions = new WebOptions();
-        webOptions.appId = this.getAppId(configOptions);
-        webOptions.authorizationBaseUrl = this.getOverwritableValue(configOptions, "authorizationBaseUrl");
-        webOptions.responseType = this.getOverwritableValue(configOptions, "responseType");
-        if (!webOptions.responseType) {
-            webOptions.responseType = "token";
+    static setCookie(name: string, value: string, ms: any) {
+        var expires = '';
+        if (ms) {
+            var date = new Date();
+            date.setTime(date.getTime() + ms * 24 * 60 * 60 * 1000);
+            expires = '; expires=' + date.toUTCString();
         }
-        webOptions.redirectUrl = this.getOverwritableValue(configOptions, "redirectUrl");
+        document.cookie = name + '=' + (value || '') + expires + "; path=/";
+    }
+    static getCookie(name: string) {
+        var nameEQ = name + '=';
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) == 0)
+                return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    }
+    static eraseCookie(name : string) {
+        document.cookie = name + '=; Max-Age=-99999999;';
+    }
+    static async buildWebOptions(configOptions : OAuth2AuthenticateOptions) {
+        const webOptions = new WebOptions() as any;
+        webOptions.appId = this.getAppId(configOptions);
+        webOptions.code = configOptions.code;
+        webOptions.authorizationBaseUrl = this.getOverwritableValue(
+            configOptions,
+            'authorizationBaseUrl'
+        );
+        webOptions.responseType = this.getOverwritableValue(
+            configOptions,
+            'responseType'
+        );
+        if (!webOptions.responseType) {
+            webOptions.responseType = 'token';
+        }
+        webOptions.redirectUrl = this.getOverwritableValue(
+            configOptions,
+            'redirectUrl'
+        );
         // controlling parameters
-        webOptions.resourceUrl = this.getOverwritableValue(configOptions, "resourceUrl");
-        webOptions.accessTokenEndpoint = this.getOverwritableValue(configOptions, "accessTokenEndpoint");
-
-        webOptions.pkceEnabled = this.getOverwritableValue(configOptions, "pkceEnabled");
+        webOptions.resourceUrl = this.getOverwritableValue(
+            configOptions,
+            'resourceUrl'
+        );
+        webOptions.accessTokenEndpoint = this.getOverwritableValue(
+            configOptions,
+            'accessTokenEndpoint'
+        );
+        webOptions.pkceEnabled = this.getOverwritableValue(
+            configOptions,
+            'pkceEnabled'
+        );
         if (webOptions.pkceEnabled) {
-            webOptions.pkceCodeVerifier = this.randomString(64);
-            if (CryptoUtils.HAS_SUBTLE_CRYPTO) {
-                await CryptoUtils.deriveChallenge(webOptions.pkceCodeVerifier).then(c => {
-                    webOptions.pkceCodeChallenge = c;
-                    webOptions.pkceCodeChallengeMethod = "S256";
-                });
+            if (webOptions.code) {
+                var saved = this.getCookie('pkce');
+                this.eraseCookie('pkce');
+                var pkce = JSON.parse(saved as string);
+                webOptions.pkceCodeChallenge = pkce.pkceCodeChallenge;
+                webOptions.pkceCodeVerifier = pkce.pkceCodeVerifier;
             } else {
-                webOptions.pkceCodeChallenge = webOptions.pkceCodeVerifier;
-                webOptions.pkceCodeChallengeMethod = "plain";
+                webOptions.pkceCodeVerifier = this.randomString(64);
+                if (CryptoUtils.HAS_SUBTLE_CRYPTO) {
+                    await CryptoUtils.deriveChallenge(
+                        webOptions.pkceCodeVerifier
+                    ).then((c) => {
+                        webOptions.pkceCodeChallenge = c;
+                        webOptions.pkceCodeChallengeMethod = 'S256';
+                    });
+                } else {
+                    webOptions.pkceCodeChallenge = webOptions.pkceCodeVerifier;
+                    webOptions.pkceCodeChallengeMethod = 'plain';
+                }
+                const toSave = {
+                    pkceCodeVerifier: webOptions.pkceCodeVerifier,
+                    pkceCodeChallenge: webOptions.pkceCodeChallenge
+                };
+                this.eraseCookie('pkce');
+                this.setCookie('pkce', JSON.stringify(toSave), null);
             }
         }
-        webOptions.scope = this.getOverwritableValue(configOptions, "scope");
-        webOptions.state = this.getOverwritableValue(configOptions, "state");
+        webOptions.scope = this.getOverwritableValue(configOptions, 'scope');
+        webOptions.state = this.getOverwritableValue(configOptions, 'state');
         if (!webOptions.state || webOptions.state.length === 0) {
             webOptions.state = this.randomString(20);
         }
-        let parametersMapHelper = this.getOverwritableValue<{ [key: string]: string }>(configOptions, "additionalParameters");
+        let parametersMapHelper = this.getOverwritableValue(
+            configOptions,
+            'additionalParameters'
+        ) as any;
         if (parametersMapHelper) {
             webOptions.additionalParameters = {};
             for (const key in parametersMapHelper) {
@@ -165,7 +225,10 @@ export class WebUtils {
                 }
             }
         }
-        let headersMapHelper = this.getOverwritableValue<{ [key: string]: string }>(configOptions, "additionalResourceHeaders");
+        let headersMapHelper = this.getOverwritableValue(
+            configOptions,
+            'additionalResourceHeaders'
+        ) as any;
         if (headersMapHelper) {
             webOptions.additionalResourceHeaders = {};
             for (const key in headersMapHelper) {
@@ -177,8 +240,10 @@ export class WebUtils {
                 }
             }
         }
-        webOptions.logsEnabled = this.getOverwritableValue(configOptions, "logsEnabled");
-
+        webOptions.logsEnabled = this.getOverwritableValue(
+            configOptions,
+            'logsEnabled'
+        );
         if (configOptions.web) {
             if (configOptions.web.windowOptions) {
                 webOptions.windowOptions = configOptions.web.windowOptions;

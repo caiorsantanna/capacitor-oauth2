@@ -20,107 +20,189 @@ export class OAuth2ClientPluginWeb extends WebPlugin implements OAuth2ClientPlug
         });
     }
 
-    async authenticate(options: OAuth2AuthenticateOptions): Promise<any> {
-        this.webOptions = await WebUtils.buildWebOptions(options);
-        return new Promise<any>((resolve, reject) => {
-            // validate
-            if (!this.webOptions.appId || this.webOptions.appId.length == 0) {
-                reject(new Error("ERR_PARAM_NO_APP_ID"));
-            } else if (!this.webOptions.authorizationBaseUrl || this.webOptions.authorizationBaseUrl.length == 0) {
-                reject(new Error("ERR_PARAM_NO_AUTHORIZATION_BASE_URL"));
-            } else if (!this.webOptions.redirectUrl || this.webOptions.redirectUrl.length == 0) {
-                reject(new Error("ERR_PARAM_NO_REDIRECT_URL"));
-            } else if (!this.webOptions.responseType || this.webOptions.responseType.length == 0) {
-                reject(new Error("ERR_PARAM_NO_RESPONSE_TYPE"));
-            } else {
-                // init internal control params
-                let loopCount = this.loopCount;
-                this.windowClosedByPlugin = false;
-                // open window
-                const authorizationUrl = WebUtils.getAuthorizationUrl(this.webOptions);
-                if (this.webOptions.logsEnabled) {
-                    this.doLog("Authorization url: " + authorizationUrl);
-                }
-                this.windowHandle = window.open(
-                    authorizationUrl,
-                    this.webOptions.windowTarget,
-                    this.webOptions.windowOptions,
-                    this.webOptions.windowReplace);
-                // wait for redirect and resolve the
-                this.intervalId = window.setInterval(() => {
-                    if (loopCount-- < 0) {
-                        this.closeWindow();
-                    } else if (this.windowHandle?.closed && !this.windowClosedByPlugin) {
-                        window.clearInterval(this.intervalId);
-                        reject(new Error("USER_CANCELLED"));
-                    } else {
-                        let href: string = undefined!;
-                        try {
-                            href = this.windowHandle?.location.href!;
-                        } catch (ignore) {
-                            // ignore DOMException: Blocked a frame with origin "http://localhost:4200" from accessing a cross-origin frame.
-                        }
+	getAccessTokenFromCode(authorizationRedirectUrlParamObj:any, resolve:any, reject:any) {
+		if (this.webOptions.accessTokenEndpoint) {
+			const self = this;
+			let authorizationCode = authorizationRedirectUrlParamObj.code;
+			if (authorizationCode) {
+				const tokenRequest = new XMLHttpRequest();
+				tokenRequest.onload = function () {
+					if (this.status === 200) {
+						let accessTokenResponse = JSON.parse(this.response);
+						if (self.webOptions.logsEnabled) {
+							self.doLog(
+								'Access token response:',
+								accessTokenResponse
+							);
+						}
+						self.requestResource(
+							accessTokenResponse.access_token,
+							resolve,
+							reject,
+							authorizationRedirectUrlParamObj,
+							accessTokenResponse
+						);
+					}
+				};
+				tokenRequest.onerror = function () {
+					// always log error because of CORS hint
+					self.doLog(
+						'ERR_GENERAL: See client logs. It might be CORS. Status text: ' +
+							this.statusText
+					);
+					reject(new Error('ERR_GENERAL'));
+				};
+				tokenRequest.open(
+					'POST',
+					this.webOptions.accessTokenEndpoint,
+					true
+				);
+				tokenRequest.setRequestHeader('accept', 'application/json');
+				tokenRequest.setRequestHeader('cache-control', 'no-cache');
+				tokenRequest.setRequestHeader(
+					'content-type',
+					'application/x-www-form-urlencoded'
+				);
+				tokenRequest.send(
+					WebUtils.getTokenEndpointData(
+						this.webOptions,
+						authorizationCode
+					)
+				);
+			} else {
+				reject(new Error('ERR_NO_AUTHORIZATION_CODE'));
+			}
+			if (this.webOptions.windowTarget != '_self') this.closeWindow();
+		} else {
+			// if no accessTokenEndpoint exists request the resource
+			this.requestResource(
+				authorizationRedirectUrlParamObj.access_token,
+				resolve,
+				reject,
+				authorizationRedirectUrlParamObj
+			);
+		}
+	}
 
-                        if (href != null && href.indexOf(this.webOptions.redirectUrl) >= 0) {
-                            if (this.webOptions.logsEnabled) {
-                                this.doLog("Url from Provider: " + href);
-                            }
-                            let authorizationRedirectUrlParamObj = WebUtils.getUrlParams(href);
-                            if (authorizationRedirectUrlParamObj) {
-                                if (this.webOptions.logsEnabled) {
-                                    this.doLog("Authorization response:", authorizationRedirectUrlParamObj);
-                                }
-                                window.clearInterval(this.intervalId);
-                                // check state
-                                if (authorizationRedirectUrlParamObj.state === this.webOptions.state) {
-                                    if (this.webOptions.accessTokenEndpoint) {
-                                        const self = this;
-                                        let authorizationCode = authorizationRedirectUrlParamObj.code;
-                                        if (authorizationCode) {
-                                            const tokenRequest = new XMLHttpRequest();
-                                            tokenRequest.onload = function () {
-                                                if (this.status === 200) {
-                                                    let accessTokenResponse = JSON.parse(this.response);
-                                                    if (self.webOptions.logsEnabled) {
-                                                        self.doLog("Access token response:", accessTokenResponse);
-                                                    }
-                                                    self.requestResource(accessTokenResponse.access_token, resolve, reject, authorizationRedirectUrlParamObj, accessTokenResponse);
-                                                }
-                                            };
-                                            tokenRequest.onerror = function () {
-                                                // always log error because of CORS hint
-                                                self.doLog("ERR_GENERAL: See client logs. It might be CORS. Status text: " + this.statusText);
-                                                reject(new Error("ERR_GENERAL"));
-                                            };
-                                            tokenRequest.open("POST", this.webOptions.accessTokenEndpoint, true);
-                                            tokenRequest.setRequestHeader('accept', 'application/json');
-                                            tokenRequest.setRequestHeader('cache-control', 'no-cache');
-                                            tokenRequest.setRequestHeader('content-type', 'application/x-www-form-urlencoded');
-                                            tokenRequest.send(WebUtils.getTokenEndpointData(this.webOptions, authorizationCode));
-                                        } else {
-                                            reject(new Error("ERR_NO_AUTHORIZATION_CODE"));
-                                        }
-                                        this.closeWindow();
-                                    } else {
-                                        // if no accessTokenEndpoint exists request the resource
-                                        this.requestResource(authorizationRedirectUrlParamObj.access_token, resolve, reject, authorizationRedirectUrlParamObj);
-                                    }
-                                } else {
-                                    if (this.webOptions.logsEnabled) {
-                                        this.doLog("State from web options: " + this.webOptions.state);
-                                        this.doLog("State returned from provider: " + authorizationRedirectUrlParamObj.state);
-                                    }
-                                    reject(new Error("ERR_STATES_NOT_MATCH"));
-                                    this.closeWindow();
-                                }
-                            }
-                            // this is no error no else clause required
-                        }
-                    }
-                }, this.intervalLength);
-            }
-        });
-    }
+	openWindow(resolve:any, reject:any) {
+		let loopCount = this.loopCount;
+		this.windowClosedByPlugin = false;
+		// open window
+		const authorizationUrl = WebUtils.getAuthorizationUrl(this.webOptions);
+		if (this.webOptions.logsEnabled) {
+			this.doLog('Authorization url: ' + authorizationUrl);
+		}
+		this.windowHandle = window.open(
+			authorizationUrl,
+			this.webOptions.windowTarget,
+			this.webOptions.windowOptions
+		);
+		// wait for redirect and resolve the
+		this.intervalId = window.setInterval(() => {
+			var _a, _b;
+			if (loopCount-- < 0) {
+				if (this.webOptions.windowTarget != '_self') this.closeWindow();
+			} else if (
+				((_a = this.windowHandle) === null || _a === void 0
+					? void 0
+					: _a.closed) &&
+				!this.windowClosedByPlugin
+			) {
+				window.clearInterval(this.intervalId);
+				reject(new Error('USER_CANCELLED'));
+			} else {
+				let href = undefined;
+				try {
+					href =
+						(_b = this.windowHandle) === null || _b === void 0
+							? void 0
+							: _b.location.href;
+				} catch (ignore) {
+					// ignore DOMException: Blocked a frame with origin "http://localhost:4200" from accessing a cross-origin frame.
+				}
+				if (
+					href != null &&
+					href.indexOf(this.webOptions.redirectUrl) >= 0
+				) {
+					if (this.webOptions.logsEnabled) {
+						this.doLog('Url from Provider: ' + href);
+					}
+					let authorizationRedirectUrlParamObj =
+						WebUtils.getUrlParams(href);
+					if (authorizationRedirectUrlParamObj) {
+						if (this.webOptions.logsEnabled) {
+							this.doLog(
+								'Authorization response:',
+								authorizationRedirectUrlParamObj
+							);
+						}
+						window.clearInterval(this.intervalId);
+						// check state
+						if (
+							authorizationRedirectUrlParamObj.state ===
+							this.webOptions.state
+						) {
+							this.getAccessTokenFromCode(
+								authorizationRedirectUrlParamObj,
+								resolve,
+								reject
+							);
+						} else {
+							if (this.webOptions.logsEnabled) {
+								this.doLog(
+									'State from web options: ' +
+										this.webOptions.state
+								);
+								this.doLog(
+									'State returned from provider: ' +
+										authorizationRedirectUrlParamObj.state
+								);
+							}
+							reject(new Error('ERR_STATES_NOT_MATCH'));
+							if (this.webOptions.windowTarget != '_self')
+								this.closeWindow();
+						}
+					}
+					// this is no error no else clause required
+				}
+			}
+		}, this.intervalLength);
+	}
+
+	async authenticate(options: OAuth2AuthenticateOptions) {
+		this.webOptions = await WebUtils.buildWebOptions(options);
+
+		return new Promise((resolve, reject) => {
+			// validate
+			if (!this.webOptions.appId || this.webOptions.appId.length == 0) {
+				reject(new Error('ERR_PARAM_NO_APP_ID'));
+			} else if (
+				!this.webOptions.authorizationBaseUrl ||
+				this.webOptions.authorizationBaseUrl.length == 0
+			) {
+				reject(new Error('ERR_PARAM_NO_AUTHORIZATION_BASE_URL'));
+			} else if (
+				!this.webOptions.redirectUrl ||
+				this.webOptions.redirectUrl.length == 0
+			) {
+				reject(new Error('ERR_PARAM_NO_REDIRECT_URL'));
+			} else if (
+				!this.webOptions.responseType ||
+				this.webOptions.responseType.length == 0
+			) {
+				reject(new Error('ERR_PARAM_NO_RESPONSE_TYPE'));
+			} else {
+				// init internal control params
+				if (options.code) {
+					this.getAccessTokenFromCode(
+						{ code: options.code },
+						resolve,
+						reject
+					);
+				} else this.openWindow(resolve, reject);
+			}
+		});
+	}
 
     private readonly MSG_RETURNED_TO_JS = "Returned to JS:";
 
