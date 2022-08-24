@@ -3,11 +3,17 @@ package com.byteowls.capacitor.oauth2;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.icu.util.ULocale;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import androidx.activity.result.ActivityResult;
+import androidx.annotation.RequiresApi;
 
 import com.byteowls.capacitor.oauth2.handler.AccessTokenCallback;
 import com.byteowls.capacitor.oauth2.handler.OAuth2CustomHandler;
@@ -30,7 +36,13 @@ import net.openid.appauth.TokenResponse;
 
 import org.json.JSONException;
 
+import java.sql.Array;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @CapacitorPlugin(name = "OAuth2Client")
 public class OAuth2ClientPlugin extends Plugin {
@@ -39,6 +51,7 @@ public class OAuth2ClientPlugin extends Plugin {
     private static final String PARAM_AUTHORIZATION_BASE_URL = "authorizationBaseUrl";
     private static final String PARAM_RESPONSE_TYPE = "responseType";
     private static final String PARAM_REDIRECT_URL = "redirectUrl";
+    private static final String PARAM_LOGOUT_URL = "logoutUrl";
     private static final String PARAM_SCOPE = "scope";
     private static final String PARAM_STATE = "state";
 
@@ -91,6 +104,7 @@ public class OAuth2ClientPlugin extends Plugin {
     private AuthorizationRequest authRequest;
 
     public OAuth2ClientPlugin() {
+
     }
 
     @PluginMethod()
@@ -152,8 +166,10 @@ public class OAuth2ClientPlugin extends Plugin {
         });
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     @PluginMethod()
     public void authenticate(final PluginCall call) {
+
         this.callbackId = call.getCallbackId();
         disposeAuthService();
         oauth2Options = buildAuthenticateOptions(call.getData());
@@ -169,6 +185,7 @@ public class OAuth2ClientPlugin extends Plugin {
                     public void onSuccess(String accessToken) {
                         new ResourceUrlAsyncTask(call, oauth2Options, getLogTag(), null, null).execute(accessToken);
                     }
+
 
                     @Override
                     public void onCancel() {
@@ -235,6 +252,7 @@ public class OAuth2ClientPlugin extends Plugin {
                 Uri.parse(oauth2Options.getRedirectUrl())
             );
 
+
             // app auth always uses a state
             if (oauth2Options.getState() != null) {
                 builder.setState(oauth2Options.getState());
@@ -257,9 +275,11 @@ public class OAuth2ClientPlugin extends Plugin {
             if (oauth2Options.getDisplay() != null) {
                 builder.setDisplay(oauth2Options.getDisplay());
             }
-
             if (oauth2Options.getAdditionalParameters() != null) {
                 try {
+                    //set locales that we sent through and remove from additional parameters since it is a pre-set variable
+                    builder.setUiLocales(oauth2Options.getAdditionalParameters().values().toArray()[0].toString());
+                    oauth2Options.getAdditionalParameters().remove(oauth2Options.getAdditionalParameters().keySet().toArray()[0],oauth2Options.getAdditionalParameters().values().toArray()[0]);
                     builder.setAdditionalParameters(oauth2Options.getAdditionalParameters());
                 } catch (IllegalArgumentException e) {
                     // ignore all additional parameter on error
@@ -331,6 +351,10 @@ public class OAuth2ClientPlugin extends Plugin {
             } else {
                 handleAuthorizationRequestActivity(result.getData(), call);
             }
+        }
+        //added logic for user cancel -> close()
+        if(this.oauth2Options != null && result.getData() != null){
+            call.reject(USER_CANCELLED);
         }
     }
 
