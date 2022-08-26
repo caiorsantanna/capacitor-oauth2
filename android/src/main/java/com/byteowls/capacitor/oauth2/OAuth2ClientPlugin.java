@@ -13,6 +13,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.activity.result.ActivityResult;
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import com.byteowls.capacitor.oauth2.handler.AccessTokenCallback;
@@ -24,6 +25,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import net.openid.appauth.AppAuthConfiguration;
 import net.openid.appauth.AuthState;
 import net.openid.appauth.AuthorizationException;
 import net.openid.appauth.AuthorizationRequest;
@@ -33,6 +35,8 @@ import net.openid.appauth.AuthorizationServiceConfiguration;
 import net.openid.appauth.GrantTypeValues;
 import net.openid.appauth.TokenRequest;
 import net.openid.appauth.TokenResponse;
+import net.openid.appauth.browser.BrowserDescriptor;
+import net.openid.appauth.browser.BrowserMatcher;
 
 import org.json.JSONException;
 
@@ -106,6 +110,13 @@ public class OAuth2ClientPlugin extends Plugin {
     public OAuth2ClientPlugin() {
 
     }
+
+  public final class ChromeBrowserMatcher implements BrowserMatcher {
+    @Override
+    public boolean matches(@NonNull BrowserDescriptor descriptor) {
+      return descriptor.packageName.equals("com.android.chrome");
+    }
+  }
 
     @PluginMethod()
     public void refreshToken(final PluginCall call) {
@@ -291,7 +302,11 @@ public class OAuth2ClientPlugin extends Plugin {
 
             this.authRequest = req;
 
-            this.authService = new AuthorizationService(getContext());
+
+            AppAuthConfiguration.Builder authConfigBuilder = new AppAuthConfiguration.Builder();
+            authConfigBuilder.setBrowserMatcher(new ChromeBrowserMatcher());
+
+            this.authService = new AuthorizationService(getContext(), authConfigBuilder.build());
             try {
                 Intent authIntent = this.authService.getAuthorizationRequestIntent(req);
                 this.bridge.saveCall(call);
