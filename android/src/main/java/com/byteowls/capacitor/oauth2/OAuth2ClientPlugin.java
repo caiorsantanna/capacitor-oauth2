@@ -379,13 +379,31 @@ public class OAuth2ClientPlugin extends Plugin {
             AuthorizationResponse authorizationResponse;
             AuthorizationException error;
             try {
-                if (intent.getData().getQueryParameter("state").length() > 0) {
+                String state = intent.getData().getQueryParameter("state");
+
+                if (state == null) { // url is malformed
+                    Log.i(getLogTag(), "No state found, rewriting Uri.\n");
+                    // This rewrite is spesifically for one app and for IdentitySever 4
+                    Uri uri = Uri.parse(intent.getDataString().replace("com.workcarewellness.app:/#","http://com.workcarewellness.app/?"));
+
                     authorizationResponse = new AuthorizationResponse.Builder(this.authRequest)
-                        .fromUri(Uri.parse(intent.getDataString()))
+                        .fromUri(uri)
                         .build();
-                } else {
-                    authorizationResponse = AuthorizationResponse.fromIntent(intent);
+
+                    // TODO: add a condition to remoe this error by comparing the state received with the state sent.
+                    // uri.getQueryParameter("state") ==  authorizationResponse.getState()
+                    intent.removeExtra("net.openid.appauth.AuthorizationException");
+                } else{
+                    if (state.length() > 0) {
+                        authorizationResponse = new AuthorizationResponse.Builder(this.authRequest)
+                            .fromUri(Uri.parse(intent.getDataString()))
+                            .build();
+                    } else {
+                        authorizationResponse = AuthorizationResponse.fromIntent(intent);
+                    }
                 }
+
+
                 error = AuthorizationException.fromIntent(intent);
                 this.authState.update(authorizationResponse, error);
             } catch (Exception e) {
