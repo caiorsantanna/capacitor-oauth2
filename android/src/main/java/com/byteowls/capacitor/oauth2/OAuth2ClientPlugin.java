@@ -366,7 +366,7 @@ public class OAuth2ClientPlugin extends Plugin {
             } else {
                 handleAuthorizationRequestActivity(result.getData(), call);
             }
-        }
+        } else
         //added logic for user cancel -> close()
         if(this.oauth2Options != null && result.getData() != null){
             call.reject(USER_CANCELLED);
