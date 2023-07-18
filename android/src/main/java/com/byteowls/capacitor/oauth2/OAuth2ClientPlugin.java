@@ -381,18 +381,31 @@ public class OAuth2ClientPlugin extends Plugin {
             try {
                 String state = intent.getData().getQueryParameter("state");
 
-                if (state == null) { // url is malformed
+                if (state == null) { // url is malformed or state is not present
                     Log.i(getLogTag(), "No state found, rewriting Uri.\n");
-                    // This rewrite is spesifically for one app and for IdentitySever 4
-                    Uri uri = Uri.parse(intent.getDataString().replace("com.workcarewellness.app:/#","http://com.workcarewellness.app/?"));
 
+                    String dataString = intent.getDataString();
+
+                    // This rewrite is specifically for IdentitySever 4, we don't know why we get :/# from it.
+                    if (dataString.contains(":/#"))
+                      dataString = "http://"+dataString.replace(":/#", "/?");
+
+                    // build an authresponse using the fixed uri
+                    Uri uri = Uri.parse(dataString);
                     authorizationResponse = new AuthorizationResponse.Builder(this.authRequest)
                         .fromUri(uri)
                         .build();
 
-                    // TODO: add a condition to remoe this error by comparing the state received with the state sent.
-                    // uri.getQueryParameter("state") ==  authorizationResponse.getState()
-                    intent.removeExtra("net.openid.appauth.AuthorizationException");
+                    // because of the malformed uri, ww should have a state mismatch exception (code 9), remove the exception
+                    if (authorizationResponse.getState().equals(this.authRequest.getState())) {
+                      if (intent.hasExtra("net.openid.appauth.AuthorizationException")) {
+                        String ee = intent.getStringExtra("net.openid.appauth.AuthorizationException");
+                        JSObject json = new JSObject(ee);
+                        if (json.getInt("code") == 9)
+                            intent.removeExtra("net.openid.appauth.AuthorizationException");
+                      }
+                    }
+
                 } else{
                     if (state.length() > 0) {
                         authorizationResponse = new AuthorizationResponse.Builder(this.authRequest)
