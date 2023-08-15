@@ -1,6 +1,6 @@
 {
     "name": "@velocitycubed/capacitor-oauth2",
-    "version": "1.1.6",
+    "version": "1.1.7",
     "description": "Capacitor OAuth 2 client plugin",
     "author": "Velocity",
     "homepage": "https://github.com/VelocityCubed/capacitor-oauth2",
